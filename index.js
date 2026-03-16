@@ -1,11 +1,44 @@
-{
-  "name": "discord-readme-bot",
-  "main": "index.js",
-  "scripts": {
-    "postinstall": "node deploy-commands.js"
-  },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.0.0"
+require("dotenv").config();
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
+const fs = require("fs");
+const path = require("path");
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds]
+});
+
+client.commands = new Collection();
+
+const foldersPath = path.join(__dirname, "commands");
+const commandFolders = fs.readdirSync(foldersPath);
+
+for (const folder of commandFolders) {
+  const commandsPath = path.join(foldersPath, folder);
+  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"));
+
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    client.commands.set(command.data.name, command);
   }
 }
+
+client.once("ready", () => {
+  console.log("Bot is ready!");
+});
+
+client.on("interactionCreate", async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+  }
+});
+
+client.login(process.env.TOKEN);
